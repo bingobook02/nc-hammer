@@ -2,17 +2,18 @@ package action
 
 import (
 	"fmt"
+	"regexp"
 	"strconv"
 	"time"
 
 	"github.com/Juniper/go-netconf/netconf"
 	"github.com/damianoneill/nc-hammer/result"
 	"github.com/damianoneill/nc-hammer/suite"
-	"github.com/tdewolff/minify"
-	"github.com/tdewolff/minify/xml"
 	"golang.org/x/crypto/ssh"
 )
 
+// Timeout is a global timeout for the NETCONF Session, defaults to 30 seconds, can be overrideen by the commandline
+var Timeout int
 var gSessions map[string]*netconf.Session
 
 func init() {
@@ -58,7 +59,7 @@ func ExecuteNetconf(tsStart time.Time, cID int, action suite.Action, config *sui
 		return
 	}
 
-	xmlNetconf, err := action.Netconf.ToXMLString()
+	xml, err := action.Netconf.ToXMLString()
 	if err != nil {
 		fmt.Printf("E")
 		result.Err = err.Error()
@@ -66,10 +67,9 @@ func ExecuteNetconf(tsStart time.Time, cID int, action suite.Action, config *sui
 		return
 	}
 
-	raw := netconf.RawMethod(xmlNetconf)
-	result.Request = raw.MarshalMethod()
+	raw := netconf.RawMethod(xml)
 	start := time.Now()
-	response, err := session.Exec(raw)
+	rpcReply, err := session.Exec(raw)
 	if err != nil {
 		if err.Error() == "WaitForFunc failed" {
 			delete(gSessions, strconv.Itoa(cID)+config.Hostname+":"+strconv.Itoa(config.Port))
@@ -83,17 +83,21 @@ func ExecuteNetconf(tsStart time.Time, cID int, action suite.Action, config *sui
 	result.When = float64(time.Since(tsStart).Nanoseconds() / int64(time.Millisecond))
 	result.Latency = float64(elapsed.Nanoseconds() / int64(time.Millisecond))
 
-	m := minify.New()
-	m.AddFunc("text/xml", xml.Minify)
-	minified, err := m.String("text/xml", response.RawReply)
-	if err != nil {
-		fmt.Printf("E")
-		result.Err = err.Error()
-		resultChannel <- result
-		return
+	if action.Netconf.Expected != nil {
+		match, err := regexp.MatchString(*action.Netconf.Expected, rpcReply.Data)
+		if err != nil {
+			fmt.Printf("E")
+			result.Err = err.Error()
+			resultChannel <- result
+			return
+		}
+		if !match {
+			fmt.Printf("e")
+			result.Err = "expected response did not match, expected: " + *action.Netconf.Expected + " actual: " + rpcReply.Data
+			resultChannel <- result
+			return
+		}
 	}
-	result.Response = minified
-
 	resultChannel <- result
 }
 
@@ -122,5 +126,5 @@ func createNewSession(hostname string, username string, password string) (*netco
 		Auth:            []ssh.AuthMethod{ssh.Password(password)},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
-	return netconf.DialSSHTimeout(hostname, sshConfig, 30*time.Second)
+	return netconf.DialSSHTimeout(hostname, sshConfig, time.Duration(Timeout)*time.Second)
 }

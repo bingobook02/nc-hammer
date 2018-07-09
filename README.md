@@ -5,7 +5,7 @@
 [![Go Report Card](https://goreportcard.com/badge/damianoneill/nc-hammer)](http://goreportcard.com/report/damianoneill/nc-hammer)
 [![license](https://img.shields.io/github/license/damianoneill/nc-hammer.svg)](https://github.com/damianoneill/nc-hammer/blob/master/LICENSE)
 
-If you don't have a Go evnironment setup, you can __dowload a binary__ from the [releases](https://github.com/damianoneill/nc-hammer/releases) page, I suggest you place this somewhere in an existing bin path.
+If you don't have a Go evnironment setup, you can __download a binary__ from the [releases](https://github.com/damianoneill/nc-hammer/releases) page, I suggest you place this somewhere in an existing bin path.
 
 The tool uses a YAML file to define the test suite.  A sample [Test Suite](./suite/testdata/testsuite.yml) is included in the repository.  Running a scenario generates a results directory containing a copy of the testsuite definition and its results encoded in CSV format.  The tool can then be used to generate reports against the contents within the results directory.
 
@@ -106,6 +106,20 @@ When running the testsuite the content in the XML file will be inlined as if it 
       xc:operation="delete"><name>192.0.2.4</name></interface></interfaces></area></ospf></protocols></top>
 ```
 
+A simple response validator is included with the netconf action definition.  This uses [Regex](https://en.wikipedia.org/wiki/Regular_expression) to pattern match on the response payload for a netconf rpc.  The YAML field itself is optional, if populated the regex pattern will be matched against the rpcReply and if unsuccessful will generate an error.  An example of a netconf action defined using the expected response follows:
+
+```yaml
+  - netconf:
+      hostname: 10.0.0.2
+      operation: get
+      filter:
+        type: subtree
+        select: <users/>
+      expected: "(<[^>]+>)"
+```
+
+For user unfamiliar with regex pattern matching, online tools such as [txt2re](https://txt2re.com) can really help.
+
 #### Init
 
 An init block is used to initialise the SUT, this is optional and is not required to execute a test suite.  If more than one init block is defined, the first one in the list is used.  The init block is executed once (regardless of number of clients or number of iterations), on suite startup before any other block is executed.
@@ -159,7 +173,6 @@ Available Commands:
 Flags:
       --config string   config file (default is $HOME/../nc-hammer.yaml)
   -h, --help            help for nc-hammer
-  -t, --toggle          Help message for toggle
 
 Use "nc-hammer [command] --help" for more information about a command.
 ```
@@ -185,7 +198,7 @@ scenario1
 A Test Suite run can be executed as follows, note that as the suite runs, it will write a '.' to the screen to indicate a succesful NETCONF Request and a 'E' to indicate an Error.
 
 ```sh
-$ nc-hammer run test-suite.yml
+$ nc-hammer run --timeout 60 test-suite.yml
 Testsuite /Users/doneill/scenario1/test-suite.yml started at Tue Jun 19 10:55:33 2018
  > 5 client(s) started, 10 iterations per client, 0 seconds wait between starting each client
 .................E................E...............

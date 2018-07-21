@@ -1,0 +1,19 @@
+iterations: 0
+clients: 1
+rampup: 2
+configs:
+- hostname: 00.00.00.00
+  port: 803
+  username: user
+  password: pass
+  reuseconnection: false
+blocks:
+- type: init        # sequential block type, individual actions are executed sequentially
+  actions:
+  - sleep:
+      duration: 5         # milliseconds
+  - sleep:
+      duration: 5 
+  - sleep:
+      duration: 5 
+      

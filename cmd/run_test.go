@@ -3,7 +3,10 @@ package cmd
 import (
 	"bytes"
 	"errors"
+	"io/ioutil"
 	"log"
+	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"testing"
@@ -13,30 +16,64 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var cmdTest = runCmd
+
 func Test_RunCmdArgs(t *testing.T) {
 	t.Run("no args passed to RunCmd test", func(t *testing.T) {
 		args := []string{}
 		errLen := strconv.Itoa(len(args))
-		runCmd.Args(myCmd, args)
-		assert.Equal(t, runCmd.Args(myCmd, args), errors.New("run command requires a test suite file as an argument"), "failed"+errLen)
+		runCmd.Args(cmdTest, args)
+		assert.Equal(t, runCmd.Args(cmdTest, args), errors.New("run command requires a test suite file as an argument"), "failed"+errLen)
 	})
 	t.Run("arg/path passed to RunCmd test ", func(t *testing.T) {
 		args := []string{"arg1"}
 		errLen := strconv.Itoa(len(args))
-		runCmd.Args(myCmd, args)
-		assert.Equal(t, runCmd.Args(myCmd, args), nil, "failed"+errLen)
+		runCmd.Args(cmdTest, args)
+		assert.Equal(t, runCmd.Args(cmdTest, args), nil, "failed"+errLen)
 	})
+}
+
+func Test_runCmdRun(t *testing.T) {
+	// pathArgs used to give an error
+	if os.Getenv("BE_CRASHER") == "1" {
+		log.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
+		pathArgs := []string{"error/test-suite.yml"}
+		runCmd.Run(cmdTest, pathArgs)
+		return
+	}
+
+	// Start the actual test in a different subprocess
+	cmd := exec.Command(os.Args[0], "-test.run=Test_runCmdRun")
+	cmd.Env = append(os.Environ(), "BE_CRASHER=1")
+	stdout, _ := cmd.StderrPipe()
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the log fatal message is what we expected
+	gotBytes, _ := ioutil.ReadAll(stdout)
+	got := string(gotBytes)
+	_, errReturned := suite.NewTestSuite("error/test-suite.yml") // get err that triggered fatalf
+	expected := "Problem with YAML file: " + errReturned.Error() + " "
+	if !strings.HasSuffix(got[:len(got)-1], expected) {
+		t.Fatalf("Unexpected log message. Got '%s' but should contain '%s'", got[:len(got)-1], expected)
+	}
+
+	// Check that the program exited
+	err := cmd.Wait()
+	if e, ok := err.(*exec.ExitError); !ok || e.Success() {
+		t.Fatalf("Process ran with err %v, want exit status 1", err)
+	}
 }
 
 func Test_runTestSuite(t *testing.T) {
 	start := time.Now()
 	myTs, _ := suite.NewTestSuite("../suite/testdata/test-suite.yml")
-
+	block := myTs.GetInitBlock()
 	var buff bytes.Buffer
 	log.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
 	log.SetOutput(&buff)
 
-	block := myTs.GetInitBlock()
 	runTestSuite(myTs)
 
 	got := strings.Replace(buff.String(), "\n", "", -1)
@@ -50,5 +87,11 @@ func Test_runTestSuite(t *testing.T) {
 	}
 	want += "Testsuite completed in "
 	want = strings.Replace(want, "\n", "", -1)
+
+	// testing handleBlocks
+	assert.Equal(t, myTs.Blocks[0].Type, "init")
+	assert.Equal(t, myTs.Blocks[1].Type, "concurrent")
+	assert.Equal(t, myTs.Blocks[2].Type, "sequential")
+	// testing runTestSuite output
 	assert.True(t, strings.Contains(got, want))
 }

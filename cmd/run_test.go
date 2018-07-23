@@ -68,30 +68,25 @@ func Test_runCmdRun(t *testing.T) {
 
 func Test_runTestSuite(t *testing.T) {
 	start := time.Now()
-	myTs, _ := suite.NewTestSuite("../suite/testdata/test-suite.yml")
-	block := myTs.GetInitBlock()
+	ts, _ := suite.NewTestSuite("../suite/testdata/test-suite.yml")
+	block := ts.GetInitBlock()
 	var buff bytes.Buffer
 	log.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
 	log.SetOutput(&buff)
 
-	runTestSuite(myTs)
+	runTestSuite(ts)
 
 	got := strings.Replace(buff.String(), "\n", "", -1)
-	want := "Testsuite " + myTs.File + " started at " + start.Format("Mon Jan _2 15:04:05 2006") +
-		"\n > " + strconv.Itoa(myTs.Clients) + " client(s), " +
-		strconv.Itoa(myTs.Iterations) + " iterations per client, " +
-		strconv.Itoa(myTs.Rampup) + " seconds wait between starting each client"
+	want := "Testsuite " + ts.File + " started at " + start.Format("Mon Jan _2 15:04:05 2006") +
+		"\n > " + strconv.Itoa(ts.Clients) + " client(s), " +
+		strconv.Itoa(ts.Iterations) + " iterations per client, " +
+		strconv.Itoa(ts.Rampup) + " seconds wait between starting each client"
 	if block != nil {
 		want += " > Init Block defined, executing " + strconv.Itoa(len(block.Actions)) + " init actions sequentially up front"
 		strconv.Itoa(len(block.Actions))
 	}
 	want += "Testsuite completed in "
 	want = strings.Replace(want, "\n", "", -1)
-
-	// testing handleBlocks
-	assert.Equal(t, myTs.Blocks[0].Type, "init")
-	assert.Equal(t, myTs.Blocks[1].Type, "concurrent")
-	assert.Equal(t, myTs.Blocks[2].Type, "sequential")
 	// testing runTestSuite output
 	assert.True(t, strings.Contains(got, want))
 }

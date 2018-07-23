@@ -63,7 +63,7 @@ func Test_AnalyseErrorCmdRun(t *testing.T) {
 	}
 }
 func Test_analyseErrors(t *testing.T) {
-	results, myTs, err := result.UnarchiveResults("../suite/testdata/results_test/2018-07-18-19-56-01/")
+	results, ts, err := result.UnarchiveResults("../suite/testdata/results_test/2018-07-18-19-56-01/")
 	if err != nil {
 		t.Error(err)
 	}
@@ -77,11 +77,11 @@ func Test_analyseErrors(t *testing.T) {
 	log.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
 	log.SetOutput(&buff)
 
-	analyseErrors(myCmd, myTs, results)
+	analyseErrors(myCmd, ts, results)
 
 	got := strings.TrimSpace(buff.String())
 	errLen := strconv.Itoa(len(errors))
-	want := strings.TrimSpace("Testsuite executed at " + strings.Split(myTs.File, string(filepath.Separator))[1] +
+	want := strings.TrimSpace("Testsuite executed at " + strings.Split(ts.File, string(filepath.Separator))[1] +
 		"\n" + "Total Number of Errors for suite: " + errLen)
 	if got != want {
 		t.Errorf("wanted, '%s', but got '%s'", want, got)

@@ -30,10 +30,11 @@ func captureStdoutE(sessionID int) string {
 	r, w, _ := os.Pipe()
 	os.Stdout = w
 	ExecuteNetconf(start, sessionID, myAction, myConfig, resultChannel)
+	time.Sleep(500 * time.Millisecond)
 	w.Close()
 	out, _ := ioutil.ReadAll(r)
 	os.Stdout = rescueStdout
-	st := strings.Join(strings.Fields(string(out)), " ") // stdout captured, spaces trimmed
+	st := strings.Join(strings.Fields(string(out)), " ") //stdout captured, spaces trimmed
 	return st
 }
 func Test_ExecuteNetconf(t *testing.T) {
